@@ -1,117 +1,74 @@
 import { useEffect, useRef, useState } from 'react'
-import './App.css'
-
 function App() {
+  const [messages, setMessages] = useState<string[]>([])
+  // WebSocket ref
+  const wsRef = useRef<WebSocket | null>(null)
+  // Input ref
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
- const [messages, setMessages] = useState(["Hello from server!"])
- 
+  useEffect(() => {
+    const ws = new WebSocket("ws://localhost:8080")
+    ws.onmessage = (event) => {
+      setMessages((prev) => [...prev, event.data])
+    }
+    wsRef.current = ws
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: "join",
+        payload: { roomId: "red" }
+      }))
+    }
+    return () => {
+      ws.close()
+    }
+  }, [])
 
-  // @ts-ignore
- const wsRef = useRef(); 
- // @ts-ignore
- const inputRef = useRef(); 
+  const handleSend = () => {
+    const message = inputRef.current?.value?.trim()
+    if (!message) return
+    // Send to server
+    wsRef.current?.send(JSON.stringify({
+      type: "chat",
+      payload: { message }
+    }))
+    // Don't update messages state here!
+    if (inputRef.current) {
+      inputRef.current.value = ""
+    }
+  }
 
- useEffect(() => {
-
-   const ws = new WebSocket("ws://localhost:8080");
-   
-   
-   ws.onmessage = (event) => {
-     setMessages(m => [...m, event.data]) 
-   }
-
-
-   //@ts-ignore
-   wsRef.current = ws;
-
-
-   ws.onopen = () => {
-     ws.send(JSON.stringify({
-       type:"join",
-       payload:{
-         roomId: "red" 
-       }
-     }))
-   }
-
- 
-   return () => {
-     ws.close()
-   }
- }, []) 
-
- return (
-
-   <div className='h-screen bg-black'>
-     <br /><br /><br />
-     <div className='h-[85vh]'>
-
-       {messages.map(message => <div className='m-8'> 
-         <span className='bg-white text-black rounded p-4 '>            
-           {message} 
-         </span>
-       </div>)}
-     </div>
-
-     <div className='w-full bg-white flex'>
-      
-        {/* @ts-ignore */}  
-       <input ref={inputRef} id="message" className="flex-1 p-4"></input>
-       <button onClick={() => {
-         // @ts-ignore
-         const message = inputRef.current?.value;
-         // Send chat message through WebSocket
-         // @ts-ignore
-         wsRef.current.send(JSON.stringify({
-           type: "chat",
-           payload: {
-             message: message
-           }
-         }))
-
-       }} className='bg-purple-600 text-white p-4'>
-         Send message
-       </button>
-     </div>
-   </div>
- )
+  return (
+    <div className="h-screen bg-gray-900 flex flex-col text-white">
+      {/* Title */}
+      <div className="p-4 bg-purple-700 text-center text-xl font-bold shadow-md">
+        Real-Time Chat 💬
+      </div>
+      {/* Chat messages */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+        {messages.map((message, index) => (
+          <div key={index} className="flex">
+            <span className="bg-gray-100 text-gray-900 rounded-lg px-4 py-2 shadow-md">
+              {message}
+            </span>
+          </div>
+        ))}
+      </div>
+      {/* Input Section */}
+      <div className="p-3 bg-gray-800 flex items-center gap-3">
+        <input
+          ref={inputRef}
+          id="message"
+          placeholder="Type a message..."
+          className="flex-1 p-3 rounded-md bg-gray-700 text-white outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        <button
+          onClick={handleSend}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-md font-semibold transition"
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  )
 }
-
 export default App
-
-/*
----------------------- Important Notes ----------------------
-
-Ye code ek real-time chat application implement karta hai. Main points ye hai:
-
-1. WebSocket Connection:
-  - Local server se WebSocket connection create karta hai port 8080 pe
-  - Connection establish hote hi automatically "red" room mei join ho jata hai
-  - Har new message ko messages array mei add karta hai
-
-2. State aur Refs:
-  - messages state mei saare chat messages store hote hai
-  - wsRef WebSocket connection ko store karta hai taki baad mei use kar sake
-  - inputRef input field ko reference karta hai
-
-3. UI Components:
-  - Black background ke saath full screen chat interface
-  - Upar messages display hote hai white bubbles mei
-  - Bottom mei ek input field hai message type karne ke liye
-  - Purple send button message bhejne ke liye
-
-4. Message Handling:
-  - Send button click hone pe current input value ko WebSocket ke through server ko bhej deta hai
-  - Server se aane wale messages automatically display ho jaate hai
-  - Messages JSON format mei send hote hai with type aur payload
-
-5. Cleanup:
-  - Component unmount hone pe WebSocket connection automatically close ho jata hai
-
-Is code ka basic flow ye hai:
-1. Page load -> WebSocket connection -> Room join
-2. User message type karta hai -> Send click -> Server ko message jaata hai
-3. Server message process karta hai -> Same room ke sabhi users ko message bhejta hai
-4. Receiving clients pe message display ho jaata hai
-
-*/
